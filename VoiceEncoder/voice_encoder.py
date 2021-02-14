@@ -147,7 +147,8 @@ class VoiceEncoder(nn.Module):
         if max_wave_length >= len(wav):
             wav = np.pad(wav, (0, max_wave_length - len(wav)), "constant")
             if wav_labels is not None:
-                wav_labels = np.pad(wav_labels, (0, max_wave_length - len(wav_labels)), "constant", constant_values='pad')
+                print((0, max_wave_length - len(wav_labels)))
+                wav_labels = np.pad(wav_labels, (0, max_wave_length - len(wav_labels)), "constant", constant_values=999)
 
         # Split the utterance into partials
         mel = audio.wav_to_mel_spectrogram(wav)
