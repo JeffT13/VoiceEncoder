@@ -16,7 +16,7 @@ def casewrttm_to_dvec(audio_path, rttm_path, device, sr=16000, verbose=True):
     print("Running the continuous embedding for "+str(audio_path).split('/')[-1]+"...")
 
   #create dvectors
-  embed, splits = encoder.embed_utterance(wav, labels, mask[-1])
+  embed, splits = encoder.embed_utterance(wav, mask[-1], wav_labels=labels)
 
   if verbose:
     print(np.shape(embed[0]), np.shape(embed[1]), np.shape(embed[2]))
