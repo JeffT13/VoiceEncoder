@@ -39,12 +39,15 @@ def case_to_dvec(audio_path, device, sr=16000, verbose=True):
   if verbose:
     print(np.shape(embed))
   return embed, info
-  
-  
-  
-# ------------
 
+            
+def getDiary(file_path):
+  with open(file_path, newline='\n') as f:
+      reader = csv.reader(f)
+      case_diary = list(reader)
+  return case_diary 
 
+# ------------------------------------------------------------
 # write groundtruths rttm file to label lawyers as non-judges
 # ex: case_docket = '18-280'
 def createRTTM(case_docket, label_nonjudge = False):
@@ -81,10 +84,5 @@ def createRTTM(case_docket, label_nonjudge = False):
   with open(rttm_fpath.format(case_docket.replace('-','')), 'w') as filehandle:
       for listitem in torttm:
           filehandle.write('%s\n' % listitem)
-          
-def getDiary(file_path):
-  with open(file_path, newline='\n') as f:
-      reader = csv.reader(f)
-      case_diary = list(reader)
-  return case_diary 
+
   
