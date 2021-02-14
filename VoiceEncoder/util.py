@@ -1,10 +1,6 @@
 import os, csv
 from resemblyzer import audio
-'''
 
-git submodule check (GSM)
-
-'''
 
 def case_to_dvec(file_path, casediary, device = device, sr = sr, verbose=True):
 
