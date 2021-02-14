@@ -120,7 +120,7 @@ def normalize_volume(wav, target_dBFS, increase_only=False, decrease_only=False)
 
 # new functions
 def label_wav(wav_len, casetimes, sr):
-  mask = np.zeros(wav_len)
+  mask = numpy.empty(wav_len, dtype='s256')
   st = 0
   for entry in casetimes:
     temp = entry[0].split(' ')
