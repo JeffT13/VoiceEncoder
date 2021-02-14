@@ -2,7 +2,7 @@ from ResemblyzeLegal.VoiceEncoder.hparams import *
 from ResemblyzeLegal.VoiceEncoder import audio
 
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Optional
 from torch import nn
 from time import perf_counter as timer
 import numpy as np
