@@ -36,7 +36,7 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Option
 
     # process speaker labels
     if case_rttm is not None:
-        wav_labels = label_wav(len(wav), case_rttm, source_s)
+        wav_labels = label_wav(len(wav), case_rttm, source_sr)
         wav_m, labels_m, mask = trim_long_silences(wav, wav_labels)
         return wav_m, labels_m, (wav[:len(mask)], wav_labels[:len(mask)], mask)
     else:
