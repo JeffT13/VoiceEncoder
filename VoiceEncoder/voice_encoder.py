@@ -1,6 +1,6 @@
-from resemblyzer.hparams import *
-from resemblyzer import audio
-from resemblyzer import util
+from ResemblyzeLegal.VoiceEncoder.hparams import *
+from ResemblyzeLegal.VoiceEncoder import audio
+from ResemblyzeLegal.VoiceEncoder import util
 
 from pathlib import Path
 from typing import Union, List

@@ -1,5 +1,5 @@
 from scipy.ndimage.morphology import binary_dilation
-from resemblyzer.hparams import *
+from ResemblyzeLegal.VoiceEncoder.hparams import *
 from pathlib import Path
 from typing import Optional, Union
 import numpy as np

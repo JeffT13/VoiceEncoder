@@ -1,5 +1,5 @@
 import os, csv
-from resemblyzer import audio
+from ResemblyzeLegal.VoiceEncoder import audio
 
 
 def case_to_dvec(file_path, casediary, device = device, sr = sr, verbose=True):
