@@ -10,7 +10,7 @@ import struct
 int16_max = (2 ** 15) - 1
 
 
-def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], source_sr: Optional[int]=None, casediary=case17_diary, SD = spkr_dict):
+def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Optional[string]=None, source_sr: Optional[int]=None):
     """
     Applies preprocessing operations to a waveform either on disk or in memory such that  
     The waveform will be resampled to match the data hyperparameters.
@@ -32,32 +32,20 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], source_sr: Option
         wav = librosa.resample(wav, source_sr, sampling_rate)
         
     # Apply the preprocessing: normalize volume and shorten long silences 
-    wav = audio.normalize_volume(wav, audio_norm_target_dBFS, increase_only=True)
+    wav = normalize_volume(wav, audio_norm_target_dBFS, increase_only=True)
 
     # process speaker labels
-    wav_labels = label_wav(len(wav), source_sr, casediary, SD)
-    wav_m, labels_m, mask = trim_long_silences(wav, wav_labels)
-    
-    return wav_m, labels_m, (wav[:len(mask)], wav_labels[:len(mask)], mask)
-
-
-def wav_to_mel_spectrogram(wav):
-    """
-    Derives a mel spectrogram ready to be used by the encoder from a preprocessed audio waveform.
-    Note: this not a log-mel spectrogram.
-    """
-    frames = librosa.feature.melspectrogram(
-        wav,
-        sampling_rate,
-        n_fft=int(sampling_rate * mel_window_length / 1000),
-        hop_length=int(sampling_rate * mel_window_step / 1000),
-        n_mels=mel_n_channels
-    )
-    return frames.astype(np.float32).T
+    if case_rttm is not None:
+        wav_labels = label_wav(len(wav), case_rttm, source_s)
+        wav_m, labels_m, mask = trim_long_silences(wav, wav_labels)
+        return wav_m, labels_m, (wav[:len(mask)], wav_labels[:len(mask)], mask)
+    else:
+        wav, mask = trim_long_silences(wav)
+        return wav, mask
 
 
 #audio.py file function edits
-def trim_long_silences(wav, labels):
+def trim_long_silences(wav, labels=None):
   """
   Ensures that segments without voice in the waveform remain no longer than a 
   threshold determined by the VAD parameters in params.py.
@@ -70,7 +58,6 @@ def trim_long_silences(wav, labels):
   # Trim the end of the audio to have a multiple of the window size
   idx = len(wav) - (len(wav) % samples_per_window)
   wav = wav[:idx]
-  labels = labels[:idx]
 
   # Convert the float waveform to 16-bit mono PCM
   pcm_wave = struct.pack("%dh" % len(wav), *(np.round(wav * int16_max)).astype(np.int16))
@@ -98,7 +85,25 @@ def trim_long_silences(wav, labels):
   audio_mask = binary_dilation(audio_mask, np.ones(vad_max_silence_length + 1))
   audio_mask = np.repeat(audio_mask, samples_per_window)
   
-  return wav[audio_mask == True], labels[audio_mask == True], audio_mask
+  if labels is not None:
+    labels = labels[:idx]
+    return wav[audio_mask == True], labels[audio_mask == True], audio_mask
+  else:
+    wav[audio_mask == True], audio_mask
+
+def wav_to_mel_spectrogram(wav):
+    """
+    Derives a mel spectrogram ready to be used by the encoder from a preprocessed audio waveform.
+    Note: this not a log-mel spectrogram.
+    """
+    frames = librosa.feature.melspectrogram(
+        wav,
+        sampling_rate,
+        n_fft=int(sampling_rate * mel_window_length / 1000),
+        hop_length=int(sampling_rate * mel_window_step / 1000),
+        n_mels=mel_n_channels
+    )
+    return frames.astype(np.float32).T
 
 
 def normalize_volume(wav, target_dBFS, increase_only=False, decrease_only=False):
@@ -111,4 +116,29 @@ def normalize_volume(wav, target_dBFS, increase_only=False, decrease_only=False)
         return wav
     return wav * (10 ** (dBFS_change / 20))
 
+# new functions
+def label_wav(wav_len, sr, casetimes):
+  mask = np.zeros(wav_len)
+  st = 0
+  for entry in casetimes:
+    temp = entry[0].split(' ')
+    time, spk = temp[4], temp[7]
+    idx = int(float(time)*sr)+st
+    if idx<wav_len:
+      mask[st:idx] = spk
+    else:
+      mask[st:]= spk
+    st = idx
+  return mask
+  
+def wav_label_for_melspec(wav, labels, hop=160, window=400, overlap_label='over'):
+  mel_lab = np.zeros(int(len(wav)/hop) + 1)
+  for i  in range(len(mel_lab)):
+    idx = (i*hop)
+    lab = np.array(labels[idx:idx+window])
+    if len(np.unique(lab))==1:
+      mel_lab[i]=lab[0]
+    else:
+      mel_lab[i]=overlap_label
+  return mel_lab
 

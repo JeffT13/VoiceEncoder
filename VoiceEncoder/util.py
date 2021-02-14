@@ -1,19 +1,19 @@
 import os, csv
 from ResemblyzeLegal.VoiceEncoder import audio
+from ResemblyzeLegal.VoiceEncoder import voice_encoder as VE
 
-
-def case_to_dvec(file_path, casediary, device = device, sr = sr, verbose=True):
+def casewrttm_to_dvec(audio_path, rttm_path, device, sr=16000, verbose=True):
 
   #file_path needs to be PosixPath(...)
   # using wav currently, not sure why we cant
 
   #preprocess wav file
-  wav, labels, mask = audio.preprocess_wav(file_path, source_sr=16000, casediary = casediary) #labels are case preset currently
+  wav, labels, mask = audio.preprocess_wav(audio_path, rttm_path, source_sr=sr) #labels are case preset currently
 
   #call model
-  encoder = VoiceEncoder(device)
+  encoder = VE.VoiceEncoder(device)
   if verbose:
-    print("Running the continuous embedding for "+str(file_path).split('/')[-1]+"...")
+    print("Running the continuous embedding for "+str(audio_path).split('/')[-1]+"...")
 
   #create dvectors
   embed, splits = encoder.embed_utterance(wav, labels, mask[-1])
@@ -23,7 +23,28 @@ def case_to_dvec(file_path, casediary, device = device, sr = sr, verbose=True):
   return embed, splits, (wav, labels), mask
   
   
+def case_to_dvec(audio_path, device, sr=16000, verbose=True):
+
+  #preprocess wav file
+  wav,  mask = audio.preprocess_wav(audio_path, source_sr=sr) #labels are case preset currently
+
+  #call model
+  encoder = VE.VoiceEncoder(device)
+  if verbose:
+    print("Running the continuous embedding for "+str(audio_path).split('/')[-1]+"...")
+
+  #create dvectors
+  embed, info = encoder.embed_utterance(wav, mask)
+
+  if verbose:
+    print(np.shape(embed))
+  return embed, info
   
+  
+  
+# ------------
+
+
 # write groundtruths rttm file to label lawyers as non-judges
 # ex: case_docket = '18-280'
 def createRTTM(case_docket, label_nonjudge = False):
@@ -67,29 +88,3 @@ def getDiary(file_path):
       case_diary = list(reader)
   return case_diary 
   
-  
-#NEW FUNCTIONS
-def label_wav(wav_len, sr, casetimes, spkr):
-  mask = np.zeros(wav_len)
-  st = 0
-  for entry in casetimes:
-    temp = entry[0].split(' ')
-    time, spk = temp[4], temp[7]
-    idx = int(float(time)*sr)+st
-    if idx<wav_len:
-      mask[st:idx] = spkr[spk]
-    else:
-      mask[st:]=spkr[spk]
-    st = idx
-  return mask
-
-def wav_label_for_melspec(wav, labels, hop=160, window=400, overlap_label=999):
-  mel_lab = np.zeros(int(len(wav)/hop) + 1)
-  for i  in range(len(mel_lab)):
-    idx = (i*hop)
-    lab = np.array(labels[idx:idx+window])
-    if len(np.unique(lab))==1:
-      mel_lab[i]=lab[0]
-    else:
-      mel_lab[i]=overlap_label
-  return mel_lab

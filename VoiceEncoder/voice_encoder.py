@@ -1,6 +1,5 @@
 from ResemblyzeLegal.VoiceEncoder.hparams import *
 from ResemblyzeLegal.VoiceEncoder import audio
-from ResemblyzeLegal.VoiceEncoder import util
 
 from pathlib import Path
 from typing import Union, List
@@ -118,7 +117,7 @@ class VoiceEncoder(nn.Module):
 
         return wav_slices, mel_slices
 
-    def embed_utterance(self, wav: np.ndarray, wav_labels: np.ndarray, mask: np.ndarray, rate=4, min_coverage=.75, cut_div = 8, overlap = .1):
+    def embed_utterance(self, wav: np.ndarray, mask: np.ndarray, wav_labels: Optional[np.ndarray]=None, rate=4, min_coverage=.75, cut_div = 8, overlap = .1):
         """
         Computes an embedding for a single utterance. The utterance is divided in partial
         utterances and an embedding is computed for each. The complete utterance embedding is the
@@ -147,15 +146,33 @@ class VoiceEncoder(nn.Module):
         max_wave_length = wav_slices[-1].stop
         if max_wave_length >= len(wav):
             wav = np.pad(wav, (0, max_wave_length - len(wav)), "constant")
-            wav_labels = np.pad(wav_labels, (0, max_wave_length - len(wav_labels)), "constant", constant_values=998)
+            if wav_labels is not None:
+                wav_labels = np.pad(wav_labels, (0, max_wave_length - len(wav_labels)), "constant", constant_values='pad')
 
         # Split the utterance into partials
         mel = audio.wav_to_mel_spectrogram(wav)
-        mel_lab = wav_label_for_melspec(wav, wav_labels)
         mels = np.array([mel[s] for s in mel_slices])
-
-
-        print()
+        
+        if wav_labels is not None:
+            mel_lab = audio.wav_label_for_melspec(wav, wav_labels)
+            # -----------
+            # Handle dvectors with overlapped labels
+            lab_lst = []
+            tracker = 0
+            for k, s in enumerate(mel_slices):
+              if len(np.unique(mel_lab[s]))==1:
+                lab_lst.append(mel_lab[s][0])
+              else:
+                data = Counter(mel_lab[s])
+                if data.most_common()[0][1]/len(mel_lab[s])>.75: #if 1 speaker is 75% of utterance label as spkr
+                  lab_lst.append(data.most_common()[0][0])
+                else:
+                  lab_lst.append('shared') #label as shared dvec
+                  tracker+=1
+            print("num of (mainly) cross spkr windows:", tracker)
+            PE_labels = np.asarray(lab_lst)
+            # -----------
+            
         # -----
         # Build embedding audio time labels 
         ms = 1/16
@@ -163,24 +180,6 @@ class VoiceEncoder(nn.Module):
         w = wav2time[mask==True] # take times that were marked as audio
         timetrack = np.array([(w[s][0], w[s][-1]) for s in wav_slices]) # take start and end times for dvec label
         # -----
-
-        # -----------
-        # Handle dvectors with overlapped labels
-        lab_lst = []
-        tracker = 0
-        for k, s in enumerate(mel_slices):
-          if len(np.unique(mel_lab[s]))==1:
-            lab_lst.append(mel_lab[s][0])
-          else:
-            data = Counter(mel_lab[s])
-            if data.most_common()[0][1]/len(mel_lab[s])>.75: #if 1 speaker is 75% of utterance label as spkr
-              lab_lst.append(data.most_common()[0][0])
-            else:
-              lab_lst.append(997) #label as shared dvec
-              tracker+=1
-        print("num of (mainly) cross spkr windows:", tracker)
-        PE_labels = np.asarray(lab_lst)
-        # -----------
 
         # -----------------
         # GPU Memory Management (w/ overlap)
@@ -212,9 +211,14 @@ class VoiceEncoder(nn.Module):
         # -----------------
 
         partial_embeds = np.concatenate(te, axis=0)
-        results = (partial_embeds, PE_labels, timetrack)
-        info = (wav_slices, mel_slices, mel)
-        return results, info
+        
+        if wav_labels is not None:
+            results = (partial_embeds, PE_labels, timetrack)
+            info = (wav_slices, mel_slices, mel)
+            return results, info
+        else:
+            return partial_embeds, (timetrack, wav_slices)
+            
 
     def embed_speaker(self, wavs: List[np.ndarray], **kwargs):
         """
