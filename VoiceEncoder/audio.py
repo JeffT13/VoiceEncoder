@@ -1,5 +1,6 @@
 from scipy.ndimage.morphology import binary_dilation
 from ResemblyzeLegal.VoiceEncoder.hparams import *
+from ResemblyzeLegal.VoiceEncoder.util import getDiary
 from pathlib import Path
 from typing import Optional, Union
 import numpy as np
@@ -36,7 +37,8 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Option
 
     # process speaker labels
     if case_rttm is not None:
-        wav_labels = label_wav(len(wav), case_rttm, source_sr)
+        diary = getDiary(case_rttm)
+        wav_labels = label_wav(len(wav), diary, source_sr)
         wav_m, labels_m, mask = trim_long_silences(wav, wav_labels)
         return wav_m, labels_m, (wav[:len(mask)], wav_labels[:len(mask)], mask)
     else:
@@ -117,7 +119,7 @@ def normalize_volume(wav, target_dBFS, increase_only=False, decrease_only=False)
     return wav * (10 ** (dBFS_change / 20))
 
 # new functions
-def label_wav(wav_len, sr, casetimes):
+def label_wav(wav_len, casetimes, sr):
   mask = np.zeros(wav_len)
   st = 0
   for entry in casetimes:
