@@ -10,7 +10,7 @@ import struct
 int16_max = (2 ** 15) - 1
 
 
-def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Optional[string]=None, source_sr: Optional[int]=None):
+def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Optional[str]=None, source_sr: Optional[int]=None):
     """
     Applies preprocessing operations to a waveform either on disk or in memory such that  
     The waveform will be resampled to match the data hyperparameters.
