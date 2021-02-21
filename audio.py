@@ -1,6 +1,6 @@
 from scipy.ndimage.morphology import binary_dilation
-from ResemblyzeLegal.VoiceEncoder.hparams import *
-from ResemblyzeLegal.VoiceEncoder.util import getDiary
+from VoiceEncoder.hparams import *
+from VoiceEncoder.util import getDiary
 from pathlib import Path
 from typing import Optional, Union
 import numpy as np
