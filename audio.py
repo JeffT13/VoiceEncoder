@@ -6,7 +6,7 @@ from typing import Optional, Union
 import numpy as np
 import webrtcvad
 import librosa
-import struct
+import struct, json
 
 int16_max = (2 ** 15) - 1
 
