@@ -8,7 +8,7 @@ from torch import nn
 from time import perf_counter as timer
 import numpy as np
 import torch
-import json
+import json, Counter
 
 
 class VoiceEncoder(nn.Module):
