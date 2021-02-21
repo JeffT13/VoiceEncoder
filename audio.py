@@ -11,7 +11,7 @@ import struct
 int16_max = (2 ** 15) - 1
 
 
-def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Optional[str]=None, source_sr: Optional[int]=None):
+def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Optional[str]=None, sd_path: Optional[str]=None, source_sr: Optional[int]=None):
     """
     Applies preprocessing operations to a waveform either on disk or in memory such that  
     The waveform will be resampled to match the data hyperparameters.
@@ -37,8 +37,10 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], case_rttm: Option
 
     # process speaker labels
     if case_rttm is not None:
+        with open(sd_path) as json_file: 
+          sd = json.load(json_file)
         diary = getDiary(case_rttm)
-        wav_labels = label_wav(len(wav), diary, source_sr)
+        wav_labels = label_wav(len(wav), diary, source_sr, sd)
         wav_m, labels_m, mask = trim_long_silences(wav, wav_labels)
         return wav_m, labels_m, (wav[:len(mask)], wav_labels[:len(mask)], mask)
     else:
@@ -56,14 +58,14 @@ def trim_long_silences(wav, labels=None):
   """
   # Compute the voice detection window size
   samples_per_window = (vad_window_length * sampling_rate) // 1000
-  
+
   # Trim the end of the audio to have a multiple of the window size
   idx = len(wav) - (len(wav) % samples_per_window)
   wav = wav[:idx]
 
   # Convert the float waveform to 16-bit mono PCM
   pcm_wave = struct.pack("%dh" % len(wav), *(np.round(wav * int16_max)).astype(np.int16))
-  
+
   # Perform voice activation detection
   voice_flags = []
   vad = webrtcvad.Vad(mode=3)
@@ -72,26 +74,26 @@ def trim_long_silences(wav, labels=None):
       voice_flags.append(vad.is_speech(pcm_wave[window_start * 2:window_end * 2],
                                         sample_rate=sampling_rate))
   voice_flags = np.array(voice_flags)
-  
+
   # Smooth the voice detection with a moving average
   def moving_average(array, width):
       array_padded = np.concatenate((np.zeros((width - 1) // 2), array, np.zeros(width // 2)))
       ret = np.cumsum(array_padded, dtype=float)
       ret[width:] = ret[width:] - ret[:-width]
       return ret[width - 1:] / width
-  
+
   audio_mask = moving_average(voice_flags, vad_moving_average_width)
   audio_mask = np.round(audio_mask).astype(np.bool)
-  
+
   # Dilate the voiced regions
   audio_mask = binary_dilation(audio_mask, np.ones(vad_max_silence_length + 1))
   audio_mask = np.repeat(audio_mask, samples_per_window)
-  
+
   if labels is not None:
     labels = labels[:idx]
     return wav[audio_mask == True], labels[audio_mask == True], audio_mask
   else:
-    wav[audio_mask == True], audio_mask
+    return wav[audio_mask == True], audio_mask
 
 def wav_to_mel_spectrogram(wav):
     """
@@ -119,21 +121,21 @@ def normalize_volume(wav, target_dBFS, increase_only=False, decrease_only=False)
     return wav * (10 ** (dBFS_change / 20))
 
 # new functions
-def label_wav(wav_len, casetimes, sr):
-  mask = np.empty(wav_len, dtype=str)
+def label_wav(wav_len, casetimes, sr, spkrdict):
+  mask = np.zeros(wav_len)
   st = 0
   for entry in casetimes:
     temp = entry[0].split(' ')
     time, spk = temp[4], temp[7]
     idx = int(float(time)*sr)+st
     if idx<wav_len:
-      mask[st:idx] = spk
+      mask[st:idx] = spkrdict[spk]
     else:
-      mask[st:]= spk
+      mask[st:]=spkrdict[spk]
     st = idx
   return mask
   
-def wav_label_for_melspec(wav, labels, hop=160, window=400, overlap_label='over'):
+def wav_label_for_melspec(wav, labels, hop=160, window=400, overlap_label=999):
   mel_lab = np.zeros(int(len(wav)/hop) + 1)
   for i  in range(len(mel_lab)):
     idx = (i*hop)
@@ -143,4 +145,3 @@ def wav_label_for_melspec(wav, labels, hop=160, window=400, overlap_label='over'
     else:
       mel_lab[i]=overlap_label
   return mel_lab
-

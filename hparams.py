@@ -1,4 +1,7 @@
 
+#GPU
+device = 'cuda'
+
 ## Mel-filterbank
 mel_window_length = 25  # In milliseconds
 mel_window_step = 10    # In milliseconds

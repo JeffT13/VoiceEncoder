@@ -1,88 +1,67 @@
 import os, csv
-from ResemblyzeLegal.VoiceEncoder import audio
-from ResemblyzeLegal.VoiceEncoder import voice_encoder as VE
+from VoiceEncoder import audio
+from VoiceEncoder.voice_encoder import VoiceEncoder #sorry for this
 
-def casewrttm_to_dvec(audio_path, rttm_path, device, sr=16000, verbose=True):
+def getDiary(file_path):
+  with open(file_path, newline='\n') as f:
+    reader = csv.reader(f)
+    case_diary = list(reader)
+  return case_diary 
 
-  #file_path needs to be PosixPath(...)
-  # using wav currently, not sure why we cant
-
+def casewrttm_to_dvec(audio_path, rttm_path, sd_path, device, sr=16000, verbose=True):
   #preprocess wav file
-  wav, labels, mask = audio.preprocess_wav(audio_path, rttm_path, source_sr=sr) #labels are case preset currently
-
+  wav, labels, mask = audio.preprocess_wav(audio_path, rttm_path, sd_path, source_sr=sr) #labels are case preset currently
   #call model
-  encoder = VE.VoiceEncoder(device)
+  encoder = VoiceEncoder(device)
   if verbose:
     print("Running the continuous embedding for "+str(audio_path).split('/')[-1]+"...")
-
   #create dvectors
-  embed, splits = encoder.embed_utterance(wav, mask[-1], wav_labels=labels)
-
+  embed, splits = encoder.embed_utterance(wav, mask[-1], wav_labels=labels, sd_path=sd_path, verbose=verbose)
   if verbose:
     print(np.shape(embed[0]), np.shape(embed[1]), np.shape(embed[2]))
   return embed, splits, (wav, labels), mask
   
-  
 def case_to_dvec(audio_path, device, sr=16000, verbose=True):
-
   #preprocess wav file
-  wav,  mask = audio.preprocess_wav(audio_path, source_sr=sr) #labels are case preset currently
-
+  wav, mask = audio.preprocess_wav(audio_path, source_sr=sr) #labels are case preset currently
   #call model
-  encoder = VE.VoiceEncoder(device)
+  encoder = VoiceEncoder(device)
   if verbose:
     print("Running the continuous embedding for "+str(audio_path).split('/')[-1]+"...")
-
   #create dvectors
-  embed, info = encoder.embed_utterance(wav, mask)
-
+  embed, info = encoder.embed_utterance(wav, mask, verbose=verbose)
   if verbose:
     print(np.shape(embed))
   return embed, info
 
-            
-def getDiary(file_path):
-  with open(file_path, newline='\n') as f:
-      reader = csv.reader(f)
-      case_diary = list(reader)
-  return case_diary 
-
-# ------------------------------------------------------------
-# write groundtruths rttm file to label lawyers as non-judges
-# ex: case_docket = '18-280'
-def createRTTM(case_docket, label_nonjudge = False):
-  
-  os.chdir('/content/drive/MyDrive/1006: Term Project/data')
-  path = os.getcwd()+'/'+'{}.txt'.format(case_docket)
-  txt_path = Path(path)
-
-  timelst = []
-  f = open(txt_path,'r')
-  k = f.readlines()
-  f.close()
-  for u in k:
-    t0, t1, spkr = u.split(' ')[0:3]       
-    timelst.append((float(t0),float(t1),spkr))
-
-
+def diar_to_rttm(diar, case, out_path, verbose=True):
   torttm = []
-  for i, event in enumerate(timelst):
-    #if labeling non-judge speakers 
-    if label_nonjudge:
-      if 'scotus_justice' in event[2]:
-        torttm.append(' '.join(['SPEAKER {} 1'.format(case_docket), str(event[0]), str(round(event[1]-event[0], 2)), '<NA> <NA>', event[2],'<NA> <NA>']))
-      else:
-        torttm.append(' '.join(['SPEAKER {} 1'.format(case_docket), str(event[0]), str(round(event[1]-event[0], 2)), '<NA> <NA>', 'Non-Judge','<NA> <NA>']))
-    else:
-      torttm.append(' '.join(['SPEAKER {} 1'.format(case_docket), str(event[0]), str(round(event[1]-event[0], 2)), '<NA> <NA>', event[2],'<NA> <NA>']))
-
-  if label_nonjudge:
-    rttm_fpath = os.getcwd() + '/RTTMS/w_nonjudge/{}labels_w_nonjudge.rttm'
-  else:
-    rttm_fpath = os.getcwd() + '/RTTMS/wo_nonjudge/{}labels.rttm'
-
-  with open(rttm_fpath.format(case_docket.replace('-','')), 'w') as filehandle:
+  for i, event in enumerate(diar):
+    torttm.append(' '.join(['SPEAKER '+case+' 1', str(event[1]), str(round(event[2]-event[1], 2)), '<NA> <NA>', event[0],'<NA> <NA>']))
+  with open(out_path+case+'_rdsv.rttm', 'w') as filehandle:
       for listitem in torttm:
           filehandle.write('%s\n' % listitem)
+  if verbose:
+    print('Case', case, 'diarization saved')
 
-  
+
+def rttmto_RALrttm(case, ral, in_path, out_path, verbose=True):
+    out_diary = []
+    spkr_tracker = []
+    diary = getDiary(in_path+case+'.rttm')
+    for entry in diary:
+      counter = 0
+      temp = entry[0].split(' ')
+      if temp[7] not in spkr_tracker:
+        spkr_tracker.append(temp[7])
+      if temp[7] not in ral.RAL.keys():
+        temp[7] = ral.uid
+        counter+=1
+      out_diary.append(' '.join(temp))
+    with open(out_path+case+'_ral.rttm', 'w') as filehandle:
+        for listitem in out_diary:
+            filehandle.write('%s\n' % listitem)
+        if verbose:
+          print(case, 'rttm has been RAL converted')
+          print(len(spkr_tracker), 'total speakers')
+          print([s for s in spkr_tracker if s not in ral.RAL.keys()], 'were unreffed')        

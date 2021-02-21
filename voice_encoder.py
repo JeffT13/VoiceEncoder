@@ -1,5 +1,5 @@
-from ResemblyzeLegal.VoiceEncoder.hparams import *
-from ResemblyzeLegal.VoiceEncoder import audio
+from VoiceEncoder.hparams import *
+from VoiceEncoder import audio
 
 from pathlib import Path
 from typing import Union, List, Optional
@@ -117,7 +117,7 @@ class VoiceEncoder(nn.Module):
 
         return wav_slices, mel_slices
 
-    def embed_utterance(self, wav: np.ndarray, mask: np.ndarray, wav_labels: Optional[np.ndarray]=None, rate=4, min_coverage=.75, cut_div = 8, overlap = .1):
+    def embed_utterance(self, wav: np.ndarray, mask: np.ndarray, wav_labels: Optional[np.ndarray]=None, sd_path: Optional[str]=None, rate=4, min_coverage=.75, overlap = .1, spkr_thres=.75, verbose=False):
         """
         Computes an embedding for a single utterance. The utterance is divided in partial
         utterances and an embedding is computed for each. The complete utterance embedding is the
@@ -147,15 +147,16 @@ class VoiceEncoder(nn.Module):
         if max_wave_length >= len(wav):
             wav = np.pad(wav, (0, max_wave_length - len(wav)), "constant")
             if wav_labels is not None:
-                print(max_wave_length, len(wav), len(wav_labels))
-                wav_labels = np.pad(wav_labels, (0, max_wave_length - len(wav_labels)), "constant", constant_values='pad')
+                wav_labels = np.pad(wav_labels, (0, max_wave_length - len(wav_labels)), "constant", constant_values=998)
 
         # Split the utterance into partials
         mel = audio.wav_to_mel_spectrogram(wav)
         mels = np.array([mel[s] for s in mel_slices])
         
         if wav_labels is not None:
-            mel_lab = audio.wav_label_for_melspec(wav, wav_labels)
+            with open(sd_path) as json_file: 
+              spkr_dict = json.load(json_file)
+            mel_lab = wav_label_for_melspec(wav, wav_labels)
             # -----------
             # Handle dvectors with overlapped labels
             lab_lst = []
@@ -165,12 +166,13 @@ class VoiceEncoder(nn.Module):
                 lab_lst.append(mel_lab[s][0])
               else:
                 data = Counter(mel_lab[s])
-                if data.most_common()[0][1]/len(mel_lab[s])>.75: #if 1 speaker is 75% of utterance label as spkr
+                if data.most_common()[0][1]/len(mel_lab[s])>spkr_thres: #if 1 speaker is 75% of utterance label as spkr
                   lab_lst.append(data.most_common()[0][0])
                 else:
-                  lab_lst.append('shared') #label as shared dvec
+                  lab_lst.append(997) #label as shared dvec
                   tracker+=1
-            print("num of (mainly) cross spkr windows:", tracker)
+            if verbose:
+              print("num of (mainly) cross spkr windows:", tracker)
             PE_labels = np.asarray(lab_lst)
             # -----------
             
@@ -185,6 +187,7 @@ class VoiceEncoder(nn.Module):
         # -----------------
         # GPU Memory Management (w/ overlap)
         # forward mels thru model
+        cut_div = ceil(2*rate)
         cut = np.shape(mels)[0]//cut_div
         t0 = 0
         temp_emb = []
