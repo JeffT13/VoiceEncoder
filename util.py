@@ -1,4 +1,5 @@
 import os, csv, json
+import numpy as np
 from VoiceEncoder import audio
 from VoiceEncoder.voice_encoder import VoiceEncoder #sorry for this
 
