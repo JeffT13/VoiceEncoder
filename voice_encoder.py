@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import Union, List, Optional
 from torch import nn
 from time import perf_counter as timer
+from collections import Counter
 import numpy as np
 import torch
-import json, Counter
+import json
 
 
 class VoiceEncoder(nn.Module):
