@@ -9,7 +9,7 @@ def getDiary(file_path):
     case_diary = list(reader)
   return case_diary 
 
-def casewrttm_to_dvec(audio_path, rttm_path, sd_path, device, sr=16000, verbose=True, rate=rate):
+def casewrttm_to_dvec(audio_path, rttm_path, sd_path, device, rate, sr=16000, verbose=True):
   #preprocess wav file
   wav, labels, mask = audio.preprocess_wav(audio_path, rttm_path, sd_path, source_sr=sr) #labels are case preset currently
   #call model
@@ -22,7 +22,7 @@ def casewrttm_to_dvec(audio_path, rttm_path, sd_path, device, sr=16000, verbose=
     print(np.shape(embed[0]), np.shape(embed[1]), np.shape(embed[2]))
   return embed, splits, (wav, labels), mask
   
-def case_to_dvec(audio_path, device, sr=16000, verbose=True, rate=rate):
+def case_to_dvec(audio_path, device, rate, sr=16000, verbose=True):
   #preprocess wav file
   wav, mask = audio.preprocess_wav(audio_path, source_sr=sr) #labels are case preset currently
   #call model
