@@ -158,7 +158,7 @@ class VoiceEncoder(nn.Module):
         if wav_labels is not None:
             with open(sd_path) as json_file: 
               spkr_dict = json.load(json_file)
-            mel_lab = wav_label_for_melspec(wav, wav_labels)
+            mel_lab = audio.wav_label_for_melspec(wav, wav_labels)
             # -----------
             # Handle dvectors with overlapped labels
             lab_lst = []
