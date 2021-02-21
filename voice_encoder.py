@@ -1,4 +1,5 @@
 from VoiceEncoder.hparams import *
+from VoiceEncoder.util import *
 from VoiceEncoder import audio
 
 from pathlib import Path
