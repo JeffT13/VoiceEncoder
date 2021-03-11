@@ -23,15 +23,20 @@ def casewrttm_to_dvec(audio_path, rttm_path, sd_path, device, rate, sr=16000, ve
   return embed, splits, (wav, labels), mask
   
 def case_to_dvec(audio_path, device, rate, sr=16000, verbose=True):
+  case_size =[]
   #preprocess wav file
   wav, mask = audio.preprocess_wav(audio_path, source_sr=sr) #labels are case preset currently
+  case_size = ((len(wav)/16000)/60, (len(mask)/16000)/60) 
+  if verbose:
+    
   #call model
   encoder = VoiceEncoder(device)
   if verbose:
     print("Running the continuous embedding for "+str(audio_path).split('/')[-1]+"...")
+    print((len(wav)/16000)/60, (len(mask)/16000)/60) 
   #create dvectors
   embed, info = encoder.embed_utterance(wav, mask, verbose=verbose, rate=rate)
   if verbose:
     print(np.shape(embed))
-  return embed, info
+  return embed, info, case_size
 
